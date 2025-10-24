@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Code Review · Analytics Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117; --panel: #0f141a; --text: #e6edf3; --muted: #9aa4ad; --primary: #4c8bf5; --border: #1f2630;
+      --good: #34d399; --warn: #f59e0b; --bad: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif; }
+    .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+    header { display: flex; align-items: baseline; justify-content: space-between; }
+    h1 { font-size: 20px; margin: 0; }
+    .status { color: var(--muted); font-size: 12px; }
+    .grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+    @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } }
+    .card { padding: 14px; background: #0f172a; border: 1px solid var(--border); border-radius: 10px; }
+    .card .label { color: var(--muted); font-size: 12px; }
+    .card .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+    canvas { background: #0b1220; border-radius: 10px; border: 1px solid var(--border); }
+    .error { color: var(--bad); }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Analytics Dashboard</h1>
+      <div class="status" id="status">Loading…</div>
+    </header>
+
+    <section class="panel">
+      <div class="cards">
+        <div class="card"><div class="label">Total Reviews</div><div class="value" id="totalReviews">0</div></div>
+        <div class="card"><div class="label">Total Issues</div><div class="value" id="totalIssues">0</div></div>
+        <div class="card"><div class="label">Critical Reviews</div><div class="value" id="criticalIssues">0</div></div>
+        <div class="card"><div class="label">Time Saved (hrs)</div><div class="value" id="timeSavedHours">0</div></div>
+        <div class="card"><div class="label">Avg Review Time (s)</div><div class="value" id="avgReviewTimeSeconds">0</div></div>
+        <div class="card"><div class="label">Avg Cost / Review</div><div class="value" id="avgCostPerReview">$0</div></div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <h3 style="margin-top:0">Issue Breakdown by Type</h3>
+        <canvas id="chartType" height="220"></canvas>
+      </section>
+      <section class="panel">
+        <h3 style="margin-top:0">Issue Breakdown by Severity</h3>
+        <canvas id="chartSeverity" height="220"></canvas>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h3 style="margin-top:0">Activity Trend (last 30 days)</h3>
+      <canvas id="chartTrend" height="260"></canvas>
+    </section>
+  </div>
+
+<script>
+async function fetchMetrics() {
+  try {
+    const res = await fetch('/api/analytics');
+    if (!res.ok) throw new Error('Failed to fetch analytics');
+    return await res.json();
+  } catch (e) {
+    document.getElementById('status').textContent = 'Error: ' + e.message;
+    throw e;
+  }
+}
+
+function setText(id, value) { document.getElementById(id).textContent = value; }
+
+function renderCards(summary) {
+  setText('totalReviews', summary.totalReviews);
+  setText('totalIssues', summary.totalIssues);
+  setText('criticalIssues', summary.criticalIssues);
+  setText('timeSavedHours', summary.timeSavedHours);
+  setText('avgReviewTimeSeconds', summary.avgReviewTimeSeconds);
+  setText('avgCostPerReview', '$' + (summary.avgCostPerReview || 0).toFixed(6));
+}
+
+function renderBarChart(canvasId, labels, data, color) {
+  new Chart(document.getElementById(canvasId), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: '', data, backgroundColor: color }] },
+    options: { plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#1f2630' } }, y: { grid: { color: '#1f2630' } } } }
+  });
+}
+
+function renderLineChart(canvasId, labels, dataA, dataB) {
+  new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Reviews', data: dataA, borderColor: '#4c8bf5', backgroundColor: '#4c8bf5', tension: 0.3 },
+        { label: 'Issues', data: dataB, borderColor: '#ef4444', backgroundColor: '#ef4444', tension: 0.3 },
+      ],
+    },
+    options: { plugins: { legend: { display: true } }, scales: { x: { grid: { color: '#1f2630' } }, y: { grid: { color: '#1f2630' } } } }
+  });
+}
+
+(async function init(){
+  const metrics = await fetchMetrics();
+  renderCards(metrics.summary);
+
+  const typeLabels = Object.keys(metrics.breakdown.byType);
+  const typeValues = typeLabels.map(k => metrics.breakdown.byType[k]);
+  renderBarChart('chartType', typeLabels, typeValues, '#4c8bf5');
+
+  const sevLabels = Object.keys(metrics.breakdown.bySeverity);
+  const sevValues = sevLabels.map(k => metrics.breakdown.bySeverity[k]);
+  renderBarChart('chartSeverity', sevLabels, sevValues, '#34d399');
+
+  const trendLabels = metrics.trends.map(t => t.day);
+  const trendReviews = metrics.trends.map(t => t.reviews);
+  const trendIssues = metrics.trends.map(t => t.issues);
+  renderLineChart('chartTrend', trendLabels, trendReviews, trendIssues);
+
+  document.getElementById('status').textContent = 'Ready';
+})();
+</script>
+</body>
+</html>

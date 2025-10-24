@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>my-agent · Analytics & Review</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #121826;
+      --text: #e6edf3;
+      --muted: #9aa7b5;
+      --primary: #3b82f6;
+      --accent: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --border: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    a { color: var(--primary); text-decoration: none; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    header h1 { font-size: 20px; margin: 0; }
+    .grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+    @media (min-width: 960px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .panel h2 { font-size: 16px; margin: 0 0 12px; color: var(--muted); }
+
+    .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 24px; text-align: center; background: rgba(255,255,255,0.02); }
+    .drop.drag { border-color: var(--primary); background: rgba(59, 130, 246, 0.08); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+    button { background: var(--primary); color: white; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    button.secondary { background: #394867; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    textarea { width: 100%; min-height: 220px; background: #0b1220; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .status { color: var(--muted); font-size: 13px; }
+    .metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    @media (min-width: 960px) { .metrics { grid-template-columns: repeat(5, 1fr); } }
+    .metric { background: #0b1220; border: 1px solid var(--border); padding: 12px; border-radius: 8px; }
+    .metric .label { color: var(--muted); font-size: 12px; }
+    .metric .value { font-size: 18px; font-weight: 700; }
+
+    .charts { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 960px) { .charts { grid-template-columns: 1fr 1fr; } }
+    canvas { width: 100%; height: 240px; background: #0b1220; border: 1px solid var(--border); border-radius: 8px; }
+
+    .history { max-height: 300px; overflow: auto; }
+    .history table { width: 100%; border-collapse: collapse; }
+    .history th, .history td { text-align: left; border-bottom: 1px solid var(--border); padding: 8px; font-size: 13px; }
+    .history th { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>my-agent · Code Review & Analytics</h1>
+      <div class="status" id="status">Ready</div>
+    </header>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Upload & Review</h2>
+        <div id="drop" class="drop">
+          <div>Drag & drop a file here or use select.</div>
+          <div class="actions">
+            <input type="file" id="file" style="display:none" accept=".js,.ts,.jsx,.tsx,.py,.json,.md,.go,.java,.rb,.php,.c,.cpp,.rs" />
+            <button id="select">Select File</button>
+            <button id="review" disabled>Run Review</button>
+            <button id="stop" disabled style="display:none;margin-left:8px">Stop Review</button>
+          </div>
+          <div class="status" id="fileStatus">No file selected</div>
+        </div>
+        <div style="margin-top:12px">
+          <textarea id="content" placeholder="File content preview..." readonly></textarea>
+        </div>
+        <div style="margin-top:12px">
+          <h2>Review Result</h2>
+          <textarea id="result" placeholder="Review output will appear here" readonly></textarea>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Analytics Dashboard</h2>
+        <div class="metrics" id="metrics">
+          <div class="metric"><div class="label">Total Reviews</div><div class="value" id="m-totalReviews">0</div></div>
+          <div class="metric"><div class="label">Total Issues</div><div class="value" id="m-totalIssues">0</div></div>
+          <div class="metric"><div class="label">Tokens</div><div class="value" id="m-totalTokens">0</div></div>
+          <div class="metric"><div class="label">Total Cost</div><div class="value" id="m-totalCost">$0.00</div></div>
+          <div class="metric"><div class="label">Avg Duration</div><div class="value" id="m-avgDuration">0s</div></div>
+        </div>
+        <div style="margin: 8px 0 12px 0; display:flex; align-items:center; gap:8px">
+          <div class="status">Time Range:</div>
+          <select id="range" style="background:#0b1220;color:#d1d7e0;border:1px solid var(--border);padding:6px;border-radius:6px">
+            <option value="0">Today</option>
+            <option value="3">Last 3 days</option>
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="60">Last 60 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+        </div>
+        <div class="charts">
+          <div>
+            <div class="status">Issues Breakdown</div>
+            <canvas id="chartIssues"></canvas>
+          </div>
+          <div>
+            <div class="status">Reviews Per Day</div>
+            <canvas id="chartReviews"></canvas>
+          </div>
+          <div>
+            <div class="status">Issues Per Day</div>
+            <canvas id="chartIssuesTrend"></canvas>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <h2>Recent History</h2>
+          <div class="history">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>File</th>
+                  <th>Critical</th>
+                  <th>Warnings</th>
+                  <th>Suggestions</th>
+                  <th>Tokens</th>
+                  <th>Cost</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody id="history"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const dropEl = document.getElementById('drop');
+    const selectBtn = document.getElementById('select');
+    const fileInput = document.getElementById('file');
+    const reviewBtn = document.getElementById('review');
+    const contentEl = document.getElementById('content');
+    const resultEl = document.getElementById('result');
+    const fileStatusEl = document.getElementById('fileStatus');
+
+    let selectedFile = null;
+    let fileText = '';
+
+    function setStatus(text) { statusEl.textContent = text; }
+
+    function drawBarChart(canvas, labels, values, colors) {
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width = canvas.clientWidth;
+      const H = canvas.height = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      const max = Math.max(1, ...values);
+      const pad = 24; const bw = (W - pad * 2) / values.length - 12;
+      ctx.font = '12px sans-serif'; ctx.fillStyle = '#9aa7b5';
+      values.forEach((v, i) => {
+        const x = pad + i * (bw + 12);
+        const h = Math.round((v / max) * (H - pad * 2));
+        const y = H - pad - h;
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fillRect(x, y, bw, h);
+        ctx.fillStyle = '#9aa7b5';
+        ctx.fillText(labels[i], x, H - pad + 12);
+      });
+    }
+
+    function drawLineChart(canvas, labels, values, color = '#3b82f6') {
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width = canvas.clientWidth;
+      const H = canvas.height = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      const max = Math.max(1, ...values);
+      const pad = 24; const step = (W - pad * 2) / Math.max(1, values.length - 1);
+      // Axes baseline
+      ctx.strokeStyle = '#1f2630'; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(pad, H - pad); ctx.lineTo(W - pad, H - pad); ctx.stroke();
+      // Line path
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+      values.forEach((v, i) => {
+        const x = pad + i * step; const y = H - pad - Math.round((v / max) * (H - pad * 2));
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      // Point markers (ensure visibility for single-point data)
+      values.forEach((v, i) => {
+        const x = pad + i * step; const y = H - pad - Math.round((v / max) * (H - pad * 2));
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+      });
+      // X labels
+      ctx.fillStyle = '#9aa7b5'; ctx.font = '12px sans-serif';
+      labels.forEach((l, i) => { const x = pad + i * step; ctx.fillText(l, x, H - pad + 12); });
+    }
+
+    function humanizeDate(dateStr) {
+      const d = new Date(dateStr); return d.toLocaleString();
+    }
+
+    async function refreshAnalytics() {
+      const res = await fetch(`/api/analytics?days=${selectedDays}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const summary = data.summary || {};
+      const breakdown = data.breakdown || { byType: {}, bySeverity: {} };
+      const trends = Array.isArray(data.trends) ? data.trends : [];
+
+      document.getElementById('m-totalReviews').textContent = summary.totalReviews || 0;
+      document.getElementById('m-totalIssues').textContent = summary.totalIssues || 0;
+      document.getElementById('m-totalTokens').textContent = (summary.totalTokens || 0).toLocaleString();
+      document.getElementById('m-totalCost').textContent = `$${(summary.totalCost || 0).toFixed(4)}`;
+      document.getElementById('m-avgDuration').textContent = `${(summary.avgReviewTimeSeconds || 0).toFixed(2)}s`;
+
+      const sev = breakdown.bySeverity || {};
+      const issueLabels = ['critical', 'high', 'medium', 'low', 'info'];
+      const issueValues = issueLabels.map(l => sev[l] || 0);
+      drawBarChart(document.getElementById('chartIssues'), issueLabels.map(s=>s[0].toUpperCase()+s.slice(1)), issueValues, ['#ef4444','#f59e0b','#fbbf24','#22c55e','#3b82f6']);
+
+      const reviewsLabels = trends.map(t => t.day);
+      const reviewsValues = trends.map(t => t.reviews);
+      drawLineChart(document.getElementById('chartReviews'), reviewsLabels, reviewsValues, '#4c8bf5');
+
+      const issuesTrendLabels = trends.map(t => t.day);
+      const issuesTrendValues = trends.map(t => t.issues);
+      drawLineChart(document.getElementById('chartIssuesTrend'), issuesTrendLabels, issuesTrendValues, '#ef4444');
+
+      const hres = await fetch('/api/history?limit=20');
+      if (!hres.ok) return;
+      const history = await hres.json();
+      const tbody = document.getElementById('history');
+      tbody.innerHTML = history.map(r => `
+        <tr>
+          <td>${humanizeDate(r.timestamp)}</td>
+          <td>${r.fileName || r.repository || 'n/a'}</td>
+          <td style="color:#ef4444">${(r.issues?.critical ?? r.issues?.bySeverity?.critical ?? 0)}</td>
+          <td style="color:#f59e0b">${(r.issues?.warnings ?? r.issues?.bySeverity?.high ?? 0)}</td>
+          <td style="color:#22c55e">${(r.issues?.suggestions ?? r.issues?.bySeverity?.low ?? 0)}</td>
+          <td>${((r.tokens?.input||0)+(r.tokens?.output||0)).toLocaleString()}</td>
+          <td>$${(r.cost||0).toFixed(4)}</td>
+          <td>${((r.duration||0)/1000).toFixed(2)}s</td>
+        </tr>
+      `).join('');
+    }
+
+    function attachDropEvents() {
+      ['dragenter','dragover'].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.add('drag'); }));
+      ['dragleave','drop'].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.remove('drag'); }));
+      dropEl.addEventListener('drop', async (e) => {
+        const file = e.dataTransfer.files?.[0];
+        if (!file) return;
+        await handleFile(file);
+      });
+      selectBtn.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', async () => { const f = fileInput.files?.[0]; if (f) await handleFile(f); });
+      reviewBtn.addEventListener('click', runReview);
+    }
+
+    async function handleFile(file) {
+      selectedFile = file;
+      fileStatusEl.textContent = `Selected: ${file.name} (${Math.round(file.size/1024)} KB)`;
+      setStatus('Reading file...');
+      fileText = await file.text();
+      contentEl.value = fileText;
+      reviewBtn.disabled = !fileText;
+      setStatus('Ready to review');
+    }
+
+    async function runReview() {
+      try {
+        cancelRequested = false; isRunning = true;
+        setStatus('Running review...'); reviewBtn.disabled = true; stopBtn.style.display = 'inline-block'; stopBtn.disabled = false;
+        const res = await fetch('/api/review', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: selectedFile?.name || 'uploaded-file', content: fileText })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          if (cancelRequested) { setStatus('Review cancelled'); return; }
+          throw new Error(err.error || `Review failed (${res.status})`);
+        }
+        const data = await res.json();
+        resultEl.value = data.review || '';
+        setStatus(`Review complete · cost $${(data.metrics.cost||0).toFixed(4)} · ${(data.metrics.duration/1000).toFixed(2)}s`);
+        await refreshAnalytics();
+      } catch (e) {
+        if (cancelRequested) { setStatus('Review cancelled'); }
+        else { setStatus(`Error: ${e.message}`); }
+      } finally {
+        reviewBtn.disabled = false; stopBtn.style.display = 'none'; stopBtn.disabled = true; isRunning = false;
+      }
+    }
+
+    attachDropEvents();
+    let selectedDays = 30;
+    const rangeSel = document.getElementById('range');
+    rangeSel.addEventListener('change', () => { selectedDays = Number(rangeSel.value); refreshAnalytics(); });
+    refreshAnalytics();
+    let cancelRequested = false;
+    let isRunning = false;
+    const stopBtn = document.getElementById('stop');
+    stopBtn.addEventListener('click', async () => {
+      if (!isRunning) return;
+      cancelRequested = true;
+      stopBtn.disabled = true;
+      setStatus('Stopping review...');
+      try { await fetch('/api/review/cancel', { method: 'POST' }); } catch {}
+    });
+  </script>
+</body>
+</html>
