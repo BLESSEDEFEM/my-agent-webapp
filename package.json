@@ -1,0 +1,25 @@
+{
+  "name": "ai-code-review-agent",
+  "version": "1.0.0",
+  "description": "AI-powered code review agent with analytics dashboard",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^2.0.14",
+    "ai": "^5.0.44",
+    "simple-git": "^3.28.0",
+    "zod": "^4.1.8"
+  },
+  "scripts": {
+    "review": "bun run index.ts",
+    "dashboard": "bun run server.ts",
+    "commit": "bun run commit.ts"
+  }
+}
