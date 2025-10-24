@@ -1,0 +1,18 @@
+[
+  {
+    "fileName": "index.ts",
+    "issues": {
+      "critical": 0,
+      "warnings": 0,
+      "suggestions": 0
+    },
+    "tokens": {
+      "input": 0,
+      "output": 1910
+    },
+    "duration": 24664,
+    "cost": 0.000573,
+    "id": "review_1761076559812_61qxt92jy",
+    "timestamp": "2025-10-21T19:55:59.812Z"
+  }
+]
