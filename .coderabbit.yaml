@@ -1,0 +1,127 @@
+language: en
+
+reviews:
+  profile: "assertive"  # Options: "chill", "assertive"
+  request_changes_workflow: true
+  auto_review:
+    enabled: true
+    drafts: false
+
+  security_scanning:
+    enabled: true
+    scan_dependencies: true
+    scan_secrets: true
+    vulnerability_alerts: true
+    sast_enabled: true
+
+  ai_suggestions:
+    enabled: true
+    features:
+      - code_optimization
+      - security_best_practices
+      - performance_improvements
+      - accessibility_enhancements
+      - test_coverage
+      - conventional_commits
+
+path_instructions:
+  - path: "server.ts"
+    instructions: |
+      Review Bun server endpoints for security and robustness:
+      - Validate JSON bodies and status codes; avoid leaking internals.
+      - Ensure abort handling cleans up resources and does not leak.
+      - Prevent XSS/HTML injection in responses; set proper Content-Type.
+      - Verify analytics integration is non-blocking and resilient.
+      - Confirm error handling is consistent and typed.
+
+  - path: "index.ts"
+    instructions: |
+      Review the CLI review agent:
+      - Check streaming usage and tool integration; avoid prompt injection risks.
+      - Verify token accounting and analytics capture correctness.
+      - Ensure filesystem access is bounded and errors are handled.
+      - Prefer small, testable pure functions (e.g., issue parsing).
+
+  - path: "commit.ts"
+    instructions: |
+      Review the AI commit generator:
+      - Enforce strict Conventional Commits with types: feat, fix, perf, docs, refactor, test, chore.
+      - Validate simple-git usage: staged diffs, cached vs working-tree, error paths.
+      - Ensure Gemini prompt avoids leaking secrets and produces concise messages.
+      - Guard for no staged changes; handle edge cases cleanly.
+
+  - path: "tools.ts"
+    instructions: |
+      Review tool wrappers:
+      - Check parameters, input validation, and safe filesystem operations.
+      - Ensure tools do not perform unintended network or shell operations.
+
+  - path: "web/**/*.html"
+    instructions: |
+      Review web UI assets:
+      - Sanitize dynamic content; prevent XSS.
+      - Consider CSP, referrer policy, and cookie security.
+      - Optimize for performance (assets, rendering, accessibility basics).
+
+  - path: "tests/**/*.ts"
+    instructions: |
+      Review tests for:
+      - Determinism (no network/git dependency for unit tests).
+      - Clear setup/teardown of filesystem paths.
+      - Meaningful assertions around analytics metrics and storage.
+
+  - path: "sample/**"
+    instructions: |
+      Demo-only files to showcase issues. Prioritize educational clarity.
+      Do not block merges on style/maintainability nits. Only flag critical security issues.
+
+severity:
+  critical:
+    - security_vulnerabilities
+    - authentication_bypass
+    - data_exposure
+    - prompt_injection_risk
+  high:
+    - performance_issues
+    - security_misconfiguration
+    - insecure_dependencies
+    - reliability_risks
+  medium:
+    - maintainability_issues
+    - accessibility_issues
+    - type_safety_concerns
+  low:
+    - documentation_missing
+    - code_duplication
+    - naming_conventions
+
+code_metrics:
+  enabled: true
+  analyze:
+    - cyclomatic_complexity
+    - cognitive_complexity
+    - maintainability_index
+    - code_duplication
+    - test_coverage
+
+conventional_commits:
+  enforce: true
+  types:
+    - feat
+    - fix
+    - perf
+    - docs
+    - refactor
+    - test
+    - chore
+
+tests_required:
+  enabled: true
+  paths:
+    - "analytics.ts"
+    - "server.ts"
+
+ignore_paths:
+  - ".code-review-analytics/**"
+  - "analytics-data.json"
+  - "code_review.md"
