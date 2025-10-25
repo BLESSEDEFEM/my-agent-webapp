@@ -20,6 +20,7 @@
   "scripts": {
     "review": "bun run index.ts",
     "dashboard": "bun run server.ts",
-    "commit": "bun run commit.ts"
+    "commit": "bun run commit.ts",
+    "test": "bun test"
   }
 }
